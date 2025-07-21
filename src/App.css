@@ -2,41 +2,186 @@
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
+}
+
+.app-container {
+  width: 100%;
+}
+
+.app-container h1 {
   text-align: center;
+  margin-bottom: 2rem;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.content-container {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.days-list {
+  flex: 1;
+  min-width: 300px;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.week-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
-.card {
-  padding: 2em;
+.nav-button {
+  padding: 0.5rem 1rem;
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
 }
 
-.read-the-docs {
-  color: #888;
+.nav-button:hover {
+  background-color: #3a80d2;
+}
+
+.toggle-button {
+  padding: 0.5rem 1rem;
+  background-color: #5cb85c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-left: auto;
+}
+
+.toggle-button:hover {
+  background-color: #4cae4c;
+}
+
+.week-number {
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.day-card {
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 2px solid transparent;
+}
+
+.day-card.today {
+  border-color: #4a90e2;
+}
+
+.day-card h3 {
+  margin-top: 0;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.day-card ul {
+  padding-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.day-card li {
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.empty-item {
+  list-style-type: disc;
+  display: flex;
+  align-items: center;
+}
+
+.inline-input {
+  flex: 1;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-left: 0.5rem;
+  font-size: 0.9rem;
+}
+
+/* Styles for inline inputs are now defined in .inline-input */
+
+.rich-text {
+  flex: 1;
+  min-width: 300px;
+}
+
+.rich-text h2 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.rich-text-container {
+  width: 100%;
+  height: 400px;
+  padding: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow-y: auto;
+  background-color: white;
+}
+
+.rich-text-content {
+  font-family: Arial, sans-serif;
+}
+
+.rich-text-content h3 {
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+.rich-text-content ul {
+  margin-top: 0.5rem;
+  padding-left: 2rem;
+}
+
+.rich-text-content li {
+  margin-bottom: 0.25rem;
+}
+
+.rich-text-actions {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.copy-button {
+  padding: 0.5rem 1rem;
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.copy-button:hover {
+  background-color: #3a80d2;
+}
+
+.copy-status {
+  margin-top: 0.5rem;
+  color: #4a90e2;
+  font-size: 0.9rem;
+  text-align: right;
+  width: 100%;
 }
