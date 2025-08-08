@@ -10,6 +10,7 @@ npm run build
 
 # 3. Move build output to docs folder
 mv ./dist ./docs
+echo "www.mju.no" > docs/CNAME  # Add CNAME file for custom domain
 
 # 4. Add only docs folder and commit
 git add docs
