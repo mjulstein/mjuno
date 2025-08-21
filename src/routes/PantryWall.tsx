@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../../queryKeys';
 
 // Session storage key for Pantry config (cleared on tab close)
 const SS_PANTRY = 'pantry.session.config.v1';
@@ -216,20 +218,12 @@ const PantryWall: React.FC = () => {
   });
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [entries, setEntries] = useState<Record<string, string>>({});
   const [myValue, setMyValue] = useState<string>('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const mounted = useRef(true);
   const myId = useMemo(() => ensureUserUUID(), []);
-  const entriesRef = useRef<Record<string, string>>({});
-  const [nameDb, setNameDb] = useState<NameDb>({});
+  const queryClient = useQueryClient();
   const [nameInput, setNameInput] = useState<string>('');
-  const [nameBusy, setNameBusy] = useState(false);
-  const [nameError, setNameError] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
-
-  useEffect(() => { entriesRef.current = entries; }, [entries]);
 
   useEffect(() => {
     mounted.current = true;
@@ -238,131 +232,94 @@ const PantryWall: React.FC = () => {
 
   const canQuery = !!config?.pid && !!config?.key;
 
-  const refresh = useCallback(async () => {
-    if (!canQuery) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const [data, namesDb] = await Promise.all([
-        pantryGet(config!.pid, config!.key),
-        (async () => {
-          try { return await pantryGetJson<NameDb>(config!.pid, '_nameDb'); } catch { return {}; }
-        })(),
-      ]);
-      if (!mounted.current) return;
-      setEntries(data || {});
-      setNameDb(namesDb || {});
-      setMyValue((data && typeof data === 'object' && myId in data) ? String(data[myId]) : '');
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed to fetch';
-      if (mounted.current) setError(msg);
-    } finally {
-      if (mounted.current) setLoading(false);
-    }
-  }, [canQuery, config, myId]);
+  // Queries
+  const entriesQuery = useQuery({
+    queryKey: config ? queryKeys.pantry.entries(config.pid, config.key) : ['pantry', 'entries', 'disabled'],
+    queryFn: async () => pantryGet(config!.pid, config!.key),
+    enabled: canQuery,
+  });
 
-  useEffect(() => { refresh(); }, [refresh]);
+  const nameDbQuery = useQuery({
+    queryKey: config ? queryKeys.pantry.nameDb(config.pid) : ['pantry', 'nameDb', 'disabled'],
+    queryFn: async () => {
+      try { return await pantryGetJson<NameDb>(config!.pid, '_nameDb'); } catch { return {}; }
+    },
+    enabled: canQuery,
+  });
 
-  const [saveBusy, setSaveBusy] = useState(false);
-  const onSaveClick = useCallback(async () => {
+  // Keep myValue in sync with my entry
+  useEffect(() => {
     if (!canQuery) return;
-    setError(null);
-    setSaveBusy(true);
-    try {
-      const next = { ...(entriesRef.current || {}) } as Record<string, string>;
-      next[myId] = myValue ?? '';
+    const data = entriesQuery.data || {};
+    const next = (data && typeof data === 'object' && myId in data) ? String((data as Record<string, string>)[myId]) : '';
+    setMyValue(next);
+  }, [entriesQuery.data, canQuery, myId]);
+
+  // Mutations
+  const saveEntry = useMutation({
+    mutationFn: async (value: string) => {
+      const current = (queryClient.getQueryData<Record<string, string>>(queryKeys.pantry.entries(config!.pid, config!.key)) ?? {});
+      const next = { ...current, [myId]: value ?? '' } as Record<string, string>;
       await pantryPut(config!.pid, config!.key, next);
-      if (mounted.current) setEntries(next);
-      // After successful message update, refetch _nameDb
+      return next;
+    },
+    onSuccess: (next) => {
+      queryClient.setQueryData(queryKeys.pantry.entries(config!.pid, config!.key), next);
+      // Invalidate name DB to reflect any potential naming usage changes
+      queryClient.invalidateQueries({ queryKey: queryKeys.pantry.nameDb(config!.pid) });
+    },
+  });
+
+  const saveName = useMutation({
+    mutationFn: async (rawName: string) => {
+      let current: NameDb = nameDbQuery.data || {};
       try {
-        const latestNames = await pantryGetJson<NameDb>(config!.pid, '_nameDb');
-        if (mounted.current) setNameDb(latestNames || {});
-      } catch {
-        // ignore; keep previous nameDb
-      }
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed to save';
-      if (mounted.current) setError(msg);
-    } finally {
-      if (mounted.current) setSaveBusy(false);
-    }
-  }, [canQuery, config, myId, myValue]);
+        if (!current || Object.keys(current).length === 0) {
+          current = await pantryGetJson<NameDb>(config!.pid, '_nameDb');
+        }
+      } catch { /* ignore */ }
 
-  // Settings draft mirrors session config or hash
-  const initialHash = useMemo(() => parseHash(), []);
-  const initialSess = useMemo(() => loadSessionConfig(), []);
-  const [draftPid, setDraftPid] = useState<string>(initialSess?.pid || initialHash.pid || '');
-  const [draftKey, setDraftKey] = useState<string>(initialSess?.key || initialHash.key || '');
-  const draftValid = !!draftPid && !!draftKey;
-
-  const saveSettingsAndClose = () => {
-    const next: PantryConfig = { pid: draftPid.trim(), key: draftKey.trim() };
-    saveSessionConfig(next);
-    setConfig(next);
-    clearHashFromUrl();
-    setIsSettingsOpen(false);
-    // Auto refresh with new config
-    setTimeout(() => { refresh(); }, 0);
-  };
-
-  const onSaveName = useCallback(async () => {
-    if (!canQuery) return;
-    setNameError(null);
-    const raw = nameInput.trim();
-    if (!raw) { setNameError('Name required'); return; }
-    if (raw.includes('(') || raw.includes(')')) { setNameError('Parentheses are not allowed'); return; }
-    if (raw.length > 10) { setNameError('Max 10 characters'); return; }
-    setNameBusy(true);
-    try {
-      // Try to download _nameDb; if it fails, fall back to empty object
-      let current: NameDb;
-      try {
-        current = await pantryGetJson<NameDb>(config!.pid, '_nameDb');
-      } catch {
-        current = {};
-      }
       const namesMap: Record<string, number> = { ...(current.names || {}) };
       const usersMap: Record<string, NameTuple> = { ...(current.users || {}) };
 
       const myTuple = usersMap[myId];
-      let nextCount = (namesMap[raw] ?? 0) + 1;
-      if (myTuple && myTuple[0] === raw) {
-        // Keep existing assigned number if user re-saves same base name
+      let nextCount = (namesMap[rawName] ?? 0) + 1;
+      if (myTuple && myTuple[0] === rawName) {
         nextCount = Number(myTuple[1]) || 1;
       }
-      namesMap[raw] = Math.max(nextCount, namesMap[raw] ?? 0);
-      usersMap[myId] = [raw, nextCount];
+      namesMap[rawName] = Math.max(nextCount, namesMap[rawName] ?? 0);
+      usersMap[myId] = [rawName, nextCount];
 
       const nextDb: NameDb = { names: namesMap, users: usersMap };
 
-      // POST first if basket may not exist; fallback to PUT if already exists
       try {
         await pantryPostJson<NameDb>(config!.pid, '_nameDb', nextDb);
       } catch {
         await pantryPutJson<NameDb>(config!.pid, '_nameDb', nextDb);
       }
 
-      if (mounted.current) setNameDb(nextDb);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed to save name';
-      setNameError(msg);
-    } finally {
-      setNameBusy(false);
-    }
-  }, [canQuery, config, myId, nameInput]);
+      return nextDb;
+    },
+    onSuccess: (nextDb) => {
+      queryClient.setQueryData(queryKeys.pantry.nameDb(config!.pid), nextDb);
+    },
+  });
 
+  // Derived helpers
   const formatNameTuple = useCallback((t?: NameTuple): string | null => {
     if (!t) return null;
     const [n, c] = t;
     return c && c > 1 ? `${n}(${c})` : n || null;
   }, []);
 
+  const nameDb = useMemo(() => nameDbQuery.data || {}, [nameDbQuery.data]);
+
   const displayNameFor = useCallback((id: string): string => {
     if (id === myId) return 'you';
     const t = nameDb.users?.[id];
     const formatted = formatNameTuple(t);
     return formatted || 'anonymous';
-  }, [myId, nameDb.users, formatNameTuple]);
+  }, [myId, nameDb, formatNameTuple]);
 
   const resolvedMyDisplay = useMemo(() => {
     const t = nameDb.users?.[myId];
@@ -370,8 +327,7 @@ const PantryWall: React.FC = () => {
     return formatted || 'you';
   }, [nameDb, myId, formatNameTuple]);
 
-  // Render
-  const entriesList = useMemo(() => Object.entries(entries || {}), [entries]);
+  const entriesList = useMemo(() => Object.entries((entriesQuery.data || {}) as Record<string, string>), [entriesQuery.data]);
 
   const shareUrl = useMemo(() => {
     if (!config?.pid || !config?.key) return '';
@@ -403,6 +359,50 @@ const PantryWall: React.FC = () => {
     }
   }, [shareUrl]);
 
+  // Unified refresh triggers both queries
+  const refresh = useCallback(async () => {
+    if (!canQuery) return;
+    await Promise.allSettled([
+      entriesQuery.refetch(),
+      nameDbQuery.refetch(),
+    ]);
+  }, [canQuery, entriesQuery, nameDbQuery]);
+
+  const combinedLoading = entriesQuery.isFetching || nameDbQuery.isFetching;
+  const combinedError = (entriesQuery.error as Error | undefined)?.message
+    || (saveEntry.error as Error | undefined)?.message
+    || (saveName.error as Error | undefined)?.message
+    || (nameDbQuery.error as Error | undefined)?.message
+    || null;
+
+  // Settings draft mirrors session config or hash
+  const initialHash = useMemo(() => parseHash(), []);
+  const initialSess = useMemo(() => loadSessionConfig(), []);
+  const [draftPid, setDraftPid] = useState<string>(initialSess?.pid || initialHash.pid || '');
+  const [draftKey, setDraftKey] = useState<string>(initialSess?.key || initialHash.key || '');
+  const draftValid = !!draftPid && !!draftKey;
+
+  const saveSettingsAndClose = () => {
+    const next: PantryConfig = { pid: draftPid.trim(), key: draftKey.trim() };
+    saveSessionConfig(next);
+    setConfig(next);
+    clearHashFromUrl();
+    setIsSettingsOpen(false);
+    // Auto refresh with new config
+    setTimeout(() => { refresh(); }, 0);
+  };
+
+  // Name save handler with simple client-side validation
+  const onSaveName = useCallback(() => {
+    if (!canQuery) return;
+    const raw = nameInput.trim();
+    if (!raw) { return; }
+    if (raw.includes('(') || raw.includes(')')) { return; }
+    if (raw.length > 10) { return; }
+    saveName.mutate(raw);
+  }, [canQuery, nameInput, saveName]);
+
+  // Render
   return (
     <div style={{ padding: 16 }}>
       <header style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
@@ -440,10 +440,10 @@ const PantryWall: React.FC = () => {
               placeholder="max 10 chars, no ()"
               style={{ padding: 6, borderRadius: 6, border: '1px solid #ccc' }}
             />
-            <Button onClick={onSaveName} disabled={nameBusy || !nameInput.trim()}>{nameBusy ? 'Saving…' : 'Save name'}</Button>
+            <Button onClick={onSaveName} disabled={saveName.isPending || !nameInput.trim()}>{saveName.isPending ? 'Saving…' : 'Save name'}</Button>
             <InlineNote>Display: {resolvedMyDisplay}</InlineNote>
           </div>
-          {nameError && <ErrorText style={{ marginTop: 8 }}>{nameError}</ErrorText>}
+          {saveName.isError && <ErrorText style={{ marginTop: 8 }}>{(saveName.error as Error)?.message || 'Failed to save name'}</ErrorText>}
           <InlineNote style={{ marginTop: 6 }}>
             Names are reserved per base value. If a base name already exists, you get a number, shown in parentheses in chat (e.g., martin(2)). Parentheses are not allowed in input.
           </InlineNote>
@@ -482,10 +482,10 @@ const PantryWall: React.FC = () => {
           />
         </Field>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <Button onClick={refresh} disabled={!canQuery || loading}>{loading ? 'Refreshing…' : 'Refresh'}</Button>
-          <Button onClick={onSaveClick} disabled={!canQuery || saveBusy}>{saveBusy ? 'Saving…' : 'Save to Pantry'}</Button>
+          <Button onClick={refresh} disabled={!canQuery || combinedLoading}>{combinedLoading ? 'Refreshing…' : 'Refresh'}</Button>
+          <Button onClick={() => saveEntry.mutate(myValue)} disabled={!canQuery || saveEntry.isPending}>{saveEntry.isPending ? 'Saving…' : 'Save to Pantry'}</Button>
         </div>
-        {error && <ErrorText style={{ marginTop: 8 }}>{error}</ErrorText>}
+        {combinedError && <ErrorText style={{ marginTop: 8 }}>{combinedError}</ErrorText>}
 
         {canQuery && (
           <div style={{ marginTop: 24 }}>
