@@ -1,7 +1,17 @@
 // App.tsx - Main application component
 import './App.css';
-import { Link, Route, Routes, Navigate } from 'react-router-dom';
+import { Link, Route, Routes } from 'react-router-dom';
 import React from 'react';
+
+// Simple Home component to render existing landing content when at "/"
+const Home: React.FC = () => (
+    <div>
+        {/* Existing landing content is above */}
+    </div>
+);
+
+// Lazy load TestSheet route
+const PantryWallLazy = React.lazy(() => import('./routes/./PantryWall'));
 
 /**
  * Main application component
@@ -27,19 +37,8 @@ export const App = () => (
     <React.Suspense fallback={<div>Loading…</div>}>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/pantry-wall" element={<TestSheetLazy />} />
-        <Route path="/test-sheet" element={<Navigate to="/pantry-wall" replace />} />
+        <Route path="/pantry-wall" element={<PantryWallLazy />} />
       </Routes>
     </React.Suspense>
   </main>
 );
-
-// Simple Home component to render existing landing content when at "/"
-const Home: React.FC = () => (
-  <div>
-    {/* Existing landing content is above */}
-  </div>
-);
-
-// Lazy load TestSheet route
-const TestSheetLazy = React.lazy(() => import('./routes/./PantryWall'));
