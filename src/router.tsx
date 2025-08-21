@@ -1,12 +1,24 @@
 import React from 'react';
-import { HashRouter, BrowserRouter } from 'react-router-dom';
+import { createRouter, RouterProvider as TanStackRouterProvider, createHashHistory, createBrowserHistory } from '@tanstack/react-router';
+import { routeTree } from './routes';
 
-// Change this variable to switch routers for different environments
-export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Use HashRouter for GitHub Pages/static hosting, BrowserRouter for Node/server
-  const useHash = false; // Use BrowserRouter with 404.html fallback on deployment
-  if (useHash) {
-    return <HashRouter>{children}</HashRouter>;
+// Toggle hash vs browser history (hash useful for GitHub Pages without proper 404 handling)
+const useHash = false; // Adjust as needed
+
+const history = useHash ? createHashHistory() : createBrowserHistory();
+
+export const router = createRouter({
+  routeTree,
+  history,
+});
+
+// Augment router type for TS (module augmentation pattern)
+declare module '@tanstack/react-router' {
+  interface Register {
+    router: typeof router;
   }
-  return <BrowserRouter>{children}</BrowserRouter>;
+}
+
+export const RouterProvider: React.FC = () => {
+  return <TanStackRouterProvider router={router} />;
 };

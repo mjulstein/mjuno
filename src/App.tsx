@@ -1,12 +1,12 @@
 // App.tsx - Main application component
 import './App.css';
-import { Link } from 'react-router-dom';
-import { Routes } from './routes';
+import React from 'react';
+import { Link, Outlet } from '@tanstack/react-router';
 
 /**
- * Main application component
+ * Application layout (root route component)
  */
-export const App = () => (
+export const App: React.FC = () => (
   <>
     <header>
       <h1>
@@ -29,7 +29,9 @@ export const App = () => (
         </ul>
       </nav>
     </header>
-    <Routes />
+    <React.Suspense fallback={<div>Loading…</div>}>
+      <Outlet />
+    </React.Suspense>
     <footer>
       <p>
         The content of mju.no is open source and maintained on{' '}

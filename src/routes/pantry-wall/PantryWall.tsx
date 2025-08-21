@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { queryKeys } from '../../../queryKeys.ts';
+import { queryKeys } from '@/queryKeys.ts';
 
 // Session storage key for Pantry config (cleared on tab close)
 const SS_PANTRY = 'pantry.session.config.v1';
