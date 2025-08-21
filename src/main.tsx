@@ -9,9 +9,9 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
-      retry: 2,
-    },
-  },
+      retry: 2
+    }
+  }
 });
 
 createRoot(document.getElementById('root')!).render(
@@ -19,8 +19,13 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <RouterProvider />
       {import.meta.env.DEV && (
-        <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
+        <>
+          <ReactQueryDevtools
+            initialIsOpen={false}
+            buttonPosition="bottom-left"
+          />
+        </>
       )}
     </QueryClientProvider>
-  </StrictMode>,
+  </StrictMode>
 );

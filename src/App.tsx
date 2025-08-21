@@ -2,6 +2,7 @@
 import './App.css';
 import React from 'react';
 import { Link, Outlet } from '@tanstack/react-router';
+import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 
 /**
  * Application layout (root route component)
@@ -45,5 +46,6 @@ export const App: React.FC = () => (
         .
       </p>
     </footer>
+    {import.meta.env.DEV && <TanStackRouterDevtools position="bottom-right" />}
   </>
 );

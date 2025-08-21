@@ -22,7 +22,7 @@
   "devDependencies": {
     "@eslint/js": "^9.31.0",
     "@tanstack/react-query-devtools": "^5.85.5",
-    "@tanstack/router-devtools": "^1.131.27",
+    "@tanstack/react-router-devtools": "^1.131.27",
     "@types/luxon": "^3.7.1",
     "@types/node": "^20.16.5",
     "@types/react": "^19.1.10",
