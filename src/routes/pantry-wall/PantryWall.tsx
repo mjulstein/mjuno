@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { queryKeys } from '../../queryKeys';
+import { queryKeys } from '../../../queryKeys.ts';
 
 // Session storage key for Pantry config (cleared on tab close)
 const SS_PANTRY = 'pantry.session.config.v1';
@@ -204,7 +204,7 @@ async function pantryPostJson<T extends object>(pid: string, key: string, data: 
   if (!res.ok) throw new Error(`Pantry POST failed: ${res.status}`);
 }
 
-const PantryWall: React.FC = () => {
+export const PantryWall: React.FC = () => {
   // Ingest hash into session storage, then clean URL
   const [config, setConfig] = useState<PantryConfig | null>(() => {
     const fromHash = parseHash();
@@ -532,6 +532,3 @@ const PantryWall: React.FC = () => {
     </div>
   );
 };
-
-export default PantryWall;
-
