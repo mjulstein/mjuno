@@ -42,4 +42,4 @@ const Home: React.FC = () => (
 );
 
 // Lazy load TestSheet route
-const TestSheetLazy = React.lazy(() => import('./routes/TestSheet'));
+const TestSheetLazy = React.lazy(() => import('./routes/./PantryWall'));

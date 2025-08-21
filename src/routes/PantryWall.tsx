@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 
 // Session storage key for Pantry config (cleared on tab close)
 const SS_PANTRY = 'pantry.session.config.v1';
@@ -7,6 +8,12 @@ const COOKIE_UID = 'pantry_uid';
 
 // Types
 type PantryConfig = { pid: string; key: string };
+
+type NameTuple = [string, number];
+interface NameDb {
+  names?: Record<string, number>;
+  users?: Record<string, NameTuple>;
+}
 
 // UI helpers
 const Cog: React.FC<{ onClick?: () => void; title?: string }> = ({ onClick, title }) => (
@@ -104,8 +111,14 @@ function saveSessionConfig(cfg: PantryConfig) {
 }
 
 function getCookie(name: string): string | null {
-  const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()\[\]\\\/\+^])/g, '\\$1') + '=([^;]*)'));
-  return m ? decodeURIComponent(m[1]) : null;
+  const prefix = name + '=';
+  const parts = (document.cookie || '').split('; ').filter(Boolean);
+  for (const p of parts) {
+    if (p.startsWith(prefix)) {
+      return decodeURIComponent(p.slice(prefix.length));
+    }
+  }
+  return null;
 }
 
 function rootDomain(hostname: string): string | null {
@@ -157,7 +170,39 @@ async function pantryPut(pid: string, key: string, data: Record<string, string>)
   if (!res.ok) throw new Error(`Pantry PUT failed: ${res.status}`);
 }
 
-const TestSheet: React.FC = () => {
+// Pantry API helpers
+async function pantryGetJson<T extends object>(pid: string, key: string): Promise<T> {
+  const url = `https://getpantry.cloud/apiv1/pantry/${encodeURIComponent(pid)}/basket/${encodeURIComponent(key)}`;
+  const res = await fetch(url, { method: 'GET' });
+  if (res.status === 404) return {} as T;
+  if (!res.ok) throw new Error(`Pantry GET failed: ${res.status}`);
+  const ct = res.headers.get('content-type') || '';
+  if (ct.includes('application/json')) return (await res.json()) as T;
+  const text = await res.text();
+  try { return JSON.parse(text) as T; } catch { return {} as T; }
+}
+
+async function pantryPutJson<T extends object>(pid: string, key: string, data: T): Promise<void> {
+  const url = `https://getpantry.cloud/apiv1/pantry/${encodeURIComponent(pid)}/basket/${encodeURIComponent(key)}`;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data ?? {}),
+  });
+  if (!res.ok) throw new Error(`Pantry PUT failed: ${res.status}`);
+}
+
+async function pantryPostJson<T extends object>(pid: string, key: string, data: T): Promise<void> {
+  const url = `https://getpantry.cloud/apiv1/pantry/${encodeURIComponent(pid)}/basket/${encodeURIComponent(key)}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data ?? {}),
+  });
+  if (!res.ok) throw new Error(`Pantry POST failed: ${res.status}`);
+}
+
+const PantryWall: React.FC = () => {
   // Ingest hash into session storage, then clean URL
   const [config, setConfig] = useState<PantryConfig | null>(() => {
     const fromHash = parseHash();
@@ -178,6 +223,11 @@ const TestSheet: React.FC = () => {
   const mounted = useRef(true);
   const myId = useMemo(() => ensureUserUUID(), []);
   const entriesRef = useRef<Record<string, string>>({});
+  const [nameDb, setNameDb] = useState<NameDb>({});
+  const [nameInput, setNameInput] = useState<string>('');
+  const [nameBusy, setNameBusy] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
 
   useEffect(() => { entriesRef.current = entries; }, [entries]);
 
@@ -193,9 +243,15 @@ const TestSheet: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await pantryGet(config!.pid, config!.key);
+      const [data, namesDb] = await Promise.all([
+        pantryGet(config!.pid, config!.key),
+        (async () => {
+          try { return await pantryGetJson<NameDb>(config!.pid, '_nameDb'); } catch { return {}; }
+        })(),
+      ]);
       if (!mounted.current) return;
       setEntries(data || {});
+      setNameDb(namesDb || {});
       setMyValue((data && typeof data === 'object' && myId in data) ? String(data[myId]) : '');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to fetch';
@@ -217,6 +273,13 @@ const TestSheet: React.FC = () => {
       next[myId] = myValue ?? '';
       await pantryPut(config!.pid, config!.key, next);
       if (mounted.current) setEntries(next);
+      // After successful message update, refetch _nameDb
+      try {
+        const latestNames = await pantryGetJson<NameDb>(config!.pid, '_nameDb');
+        if (mounted.current) setNameDb(latestNames || {});
+      } catch {
+        // ignore; keep previous nameDb
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to save';
       if (mounted.current) setError(msg);
@@ -242,15 +305,150 @@ const TestSheet: React.FC = () => {
     setTimeout(() => { refresh(); }, 0);
   };
 
+  const onSaveName = useCallback(async () => {
+    if (!canQuery) return;
+    setNameError(null);
+    const raw = nameInput.trim();
+    if (!raw) { setNameError('Name required'); return; }
+    if (raw.includes('(') || raw.includes(')')) { setNameError('Parentheses are not allowed'); return; }
+    if (raw.length > 10) { setNameError('Max 10 characters'); return; }
+    setNameBusy(true);
+    try {
+      // Try to download _nameDb; if it fails, fall back to empty object
+      let current: NameDb;
+      try {
+        current = await pantryGetJson<NameDb>(config!.pid, '_nameDb');
+      } catch {
+        current = {};
+      }
+      const namesMap: Record<string, number> = { ...(current.names || {}) };
+      const usersMap: Record<string, NameTuple> = { ...(current.users || {}) };
+
+      const myTuple = usersMap[myId];
+      let nextCount = (namesMap[raw] ?? 0) + 1;
+      if (myTuple && myTuple[0] === raw) {
+        // Keep existing assigned number if user re-saves same base name
+        nextCount = Number(myTuple[1]) || 1;
+      }
+      namesMap[raw] = Math.max(nextCount, namesMap[raw] ?? 0);
+      usersMap[myId] = [raw, nextCount];
+
+      const nextDb: NameDb = { names: namesMap, users: usersMap };
+
+      // POST first if basket may not exist; fallback to PUT if already exists
+      try {
+        await pantryPostJson<NameDb>(config!.pid, '_nameDb', nextDb);
+      } catch {
+        await pantryPutJson<NameDb>(config!.pid, '_nameDb', nextDb);
+      }
+
+      if (mounted.current) setNameDb(nextDb);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to save name';
+      setNameError(msg);
+    } finally {
+      setNameBusy(false);
+    }
+  }, [canQuery, config, myId, nameInput]);
+
+  const formatNameTuple = useCallback((t?: NameTuple): string | null => {
+    if (!t) return null;
+    const [n, c] = t;
+    return c && c > 1 ? `${n}(${c})` : n || null;
+  }, []);
+
+  const displayNameFor = useCallback((id: string): string => {
+    if (id === myId) return 'you';
+    const t = nameDb.users?.[id];
+    const formatted = formatNameTuple(t);
+    return formatted || 'anonymous';
+  }, [myId, nameDb.users, formatNameTuple]);
+
+  const resolvedMyDisplay = useMemo(() => {
+    const t = nameDb.users?.[myId];
+    const formatted = formatNameTuple(t);
+    return formatted || 'you';
+  }, [nameDb, myId, formatNameTuple]);
+
   // Render
   const entriesList = useMemo(() => Object.entries(entries || {}), [entries]);
+
+  const shareUrl = useMemo(() => {
+    if (!config?.pid || !config?.key) return '';
+    const p = new URLSearchParams();
+    p.set('pid', config.pid);
+    p.set('key', config.key);
+    return `${window.location.origin}${window.location.pathname}${window.location.search}#${p.toString()}`;
+  }, [config]);
+
+  const copyShare = useCallback(async () => {
+    if (!shareUrl) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = shareUrl;
+        ta.style.position = 'fixed';
+        ta.style.left = '-1000px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 1500);
+    } catch {
+      // no-op
+    }
+  }, [shareUrl]);
 
   return (
     <div style={{ padding: 16 }}>
       <header style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
         <h2 style={{ margin: 0 }}>Pantry wall</h2>
         <Cog onClick={() => setIsSettingsOpen(true)} />
+        <Button onClick={copyShare} disabled={!shareUrl}>Share</Button>
+        {shareCopied && <InlineNote>Copied!</InlineNote>}
       </header>
+
+      {shareUrl && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+          <div>
+            <InlineNote>Scan to join this wall:</InlineNote>
+            <QRCodeSVG value={shareUrl} size={160} includeMargin aria-label="Wall join QR" />
+          </div>
+          <div style={{ minWidth: 260, flex: 1 }}>
+            <Field label="Sharable link">
+              <input type="text" readOnly value={shareUrl} style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #ccc' }} onFocus={(e) => e.currentTarget.select()} />
+            </Field>
+            <InlineNote>Opens with #pid and #key; the app ingests and hides them after load.</InlineNote>
+          </div>
+        </div>
+      )}
+
+      {/* Name setup */}
+      {canQuery && (
+        <div style={{ border: '1px solid #eee', borderRadius: 8, padding: 12, marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <label style={{ fontWeight: 600 }}>Your name</label>
+            <input
+              type="text"
+              maxLength={10}
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              placeholder="max 10 chars, no ()"
+              style={{ padding: 6, borderRadius: 6, border: '1px solid #ccc' }}
+            />
+            <Button onClick={onSaveName} disabled={nameBusy || !nameInput.trim()}>{nameBusy ? 'Saving…' : 'Save name'}</Button>
+            <InlineNote>Display: {resolvedMyDisplay}</InlineNote>
+          </div>
+          {nameError && <ErrorText style={{ marginTop: 8 }}>{nameError}</ErrorText>}
+          <InlineNote style={{ marginTop: 6 }}>
+            Names are reserved per base value. If a base name already exists, you get a number, shown in parentheses in chat (e.g., martin(2)). Parentheses are not allowed in input.
+          </InlineNote>
+        </div>
+      )}
 
       {!canQuery && (
         <div style={{ border: '1px solid #eee', borderRadius: 8, padding: 16, marginBottom: 16, background: '#fafafa' }}>
@@ -297,8 +495,7 @@ const TestSheet: React.FC = () => {
               {entriesList.map(([id, val]) => (
                 <li key={id} style={{ borderBottom: '1px solid #eee', padding: '8px 0' }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                    <code title={id} style={{ fontSize: 12, color: '#666' }}>{id}</code>
-                    {id === myId && <span style={{ fontSize: 12, color: '#0a0' }}>(you)</span>}
+                    <span style={{ fontSize: 12, color: '#666' }}>{displayNameFor(id)}</span>
                   </div>
                   <div style={{ whiteSpace: 'pre-wrap' }}>{String(val ?? '')}</div>
                 </li>
@@ -336,5 +533,5 @@ const TestSheet: React.FC = () => {
   );
 };
 
-export default TestSheet;
+export default PantryWall;
 
