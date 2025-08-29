@@ -1,13 +1,13 @@
 // App.tsx - Main application component
 import './App.css';
-import React from 'react';
 import { Link, Outlet } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
+import { type FC, Suspense } from 'react';
 
 /**
  * Application layout (root route component)
  */
-export const App: React.FC = () => (
+export const App: FC = () => (
   <>
     <header>
       <h1>
@@ -27,12 +27,15 @@ export const App: React.FC = () => (
           <li>
             <Link to="/pantry-wall">Pantry wall</Link>
           </li>
+          <li>
+            <Link to="/css-repl">Css repl</Link>
+          </li>
         </ul>
       </nav>
     </header>
-    <React.Suspense fallback={<div>Loading…</div>}>
+    <Suspense fallback={<div>Loading…</div>}>
       <Outlet />
-    </React.Suspense>
+    </Suspense>
     <footer>
       <p>
         The content of mju.no is open source and maintained on{' '}
