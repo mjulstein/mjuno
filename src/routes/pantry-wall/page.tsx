@@ -1,4 +1,4 @@
-import { PantryWall } from './PantryWall.tsx';
+import { PantryWall } from './PantryWall';
 
 export function Page() {
   return <PantryWall />;

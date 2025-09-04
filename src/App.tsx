@@ -30,6 +30,9 @@ export const App: FC = () => (
           <li>
             <Link to="/css-repl">Css repl</Link>
           </li>
+          <li>
+            <Link to="/slate-md-demo">Slate Markdown Demo</Link>
+          </li>
         </ul>
       </nav>
     </header>

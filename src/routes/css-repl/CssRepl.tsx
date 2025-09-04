@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BgColorButton } from '@/routes/css-repl/BgColorButton.tsx';
+import { BgColorButton } from '@/routes/css-repl/BgColorButton';
 
 const defaultHtml = `<div class="demo-box">Hello, world!</div>`;
 const defaultCss = `.demo-box { padding: 1rem; background: #f0f0f0; border-radius: 8px; color: #333; }`;
