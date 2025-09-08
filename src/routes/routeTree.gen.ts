@@ -9,13 +9,13 @@ const HomeLazy = lazy(() => import('./page'));
 const PantryWallLazy = lazy(() => import('./pantry-wall'));
 const CssReplLazy = lazy(() => import('./css-repl'));
 const SlateMdDemoLazy = lazy(() => import('./slate-md-demo'));
+const ConfluenceLazy = lazy(() => import('./confluence'));
 // Index (home) route
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   component: HomeLazy
 });
-
 const pantryWallRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'pantry-wall',
@@ -31,14 +31,17 @@ const SlateMdDemoRoute = createRoute({
   path: 'slate-md-demo',
   component: SlateMdDemoLazy
 });
+const ConfluenceRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'confluence',
+  component: ConfluenceLazy
+});
 
 // Add children to root and export the tree consumed by the router
 export const routeTree = rootRoute.addChildren([
   indexRoute,
   pantryWallRoute,
   CssReplRoute,
-  SlateMdDemoRoute
+  SlateMdDemoRoute,
+  ConfluenceRoute
 ]);
-
-// (Optional) export individual routes if needed elsewhere
-export { rootRoute, indexRoute, pantryWallRoute, SlateMdDemoRoute };
