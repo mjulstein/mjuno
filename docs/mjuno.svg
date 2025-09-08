@@ -1,0 +1,5 @@
+<svg width="70" height="70" viewBox="0 0 70 70" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="70" height="70" fill="lightblue" stroke="black" stroke-opacity=".5" stroke-width="7" />
+  <text x="35" y="25" font-size="30" font-family="sans-serif" fill="black" text-anchor="middle" dominant-baseline="middle">MJU</text>
+  <text x="35" y="54" font-size="22" font-family="sans-serif" fill="black" text-anchor="middle" dominant-baseline="middle">.no</text>
+</svg>

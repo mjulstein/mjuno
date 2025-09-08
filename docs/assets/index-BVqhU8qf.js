@@ -1,0 +1,9 @@
+import{j as e,l as n}from"./index-klOBdlLq.js";const r=({color:s,setColor:o})=>e.jsxs("button",{className:s,onClick:()=>o(s),children:[e.jsx("style",{children:`button.${s} {
+              width: 2rem;
+              height: 2rem;
+              border: none;
+              border-radius: 50%;
+              cursor: pointer;
+              border: 1px solid #ccc;
+              background: ${s};
+             }`}),e.jsxs("span",{className:"sr-only",children:["Set background to ",s]})]}),x='<div class="demo-box">Hello, world!</div>',m=".demo-box { padding: 1rem; background: #f0f0f0; border-radius: 8px; color: #333; }";function c(){const[s,o]=n.useState(x),[i,a]=n.useState(m),[d,t]=n.useState("#fff");return e.jsxs("main",{style:{display:"flex",gap:"2rem",alignItems:"flex-start",height:"100%",padding:"2rem"},children:[e.jsxs("div",{style:{flex:1,minWidth:"300px"},children:[e.jsxs("details",{open:!0,children:[e.jsx("summary",{children:"HTML"}),e.jsx("textarea",{value:s,onChange:l=>o(l.target.value),style:{width:"100%",minHeight:"120px",marginTop:"0.5rem",fontFamily:"monospace",fontSize:"1rem"}})]}),e.jsxs("details",{open:!0,style:{marginTop:"1.5rem"},children:[e.jsx("summary",{children:"CSS"}),e.jsx("textarea",{value:i,onChange:l=>a(l.target.value),style:{width:"100%",minHeight:"120px",marginTop:"0.5rem",fontFamily:"monospace",fontSize:"1rem"}})]})]}),e.jsxs("section",{style:{flex:1},children:[e.jsxs("div",{style:{display:"flex",gap:".5rem",marginBottom:"1rem"},children:[e.jsx(r,{color:"white",setColor:t}),e.jsx(r,{color:"black",setColor:t}),e.jsx(r,{color:"red",setColor:t}),e.jsx(r,{color:"green",setColor:t}),e.jsx(r,{color:"blue",setColor:t})]}),e.jsxs("div",{style:{flex:1,minWidth:"300px",background:d,border:"1px solid #eee",borderRadius:"8px",padding:"1rem",position:"relative"},children:[e.jsx("style",{children:i}),e.jsx("div",{dangerouslySetInnerHTML:{__html:s}})]})]})]})}function p(){return e.jsx(c,{})}export{p as default};
